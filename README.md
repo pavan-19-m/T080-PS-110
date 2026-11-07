@@ -3,7 +3,6 @@
 **Capstone Project | Team ID:** T080 | **Problem Statement:** PS-110  
 **Team Members:** Pavan Neelappa Mirji & Padmavathi B  
 **Academic Section:** CSD  
-**IDE / Assistant:** Antigravity  
 **Language:** Python 3.10+  
 
 ---
@@ -330,4 +329,3 @@ ORD-104    B-01         AGGREGATOR_A  K-02     12:06:00  12:17:00  12:40:00  Rs.
   1. **Pavan Neelappa Mirji**
   2. **Padmavathi B**
 - **Academic Section:** CSD  
-- **Mentor / Guide:** Antigravity Senior Technical Mentor  
