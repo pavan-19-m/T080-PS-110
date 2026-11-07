@@ -46,3 +46,6 @@ htmlcov/
 # Project Output
 output/
 *.log
+
+# Nested clone
+T080-PS-110/
