@@ -1,0 +1,6 @@
+item_id,brand_id,name,price,recipe_id
+ITM-BURGER,B-01,Classic Cheeseburger,220.00,REC-BURGER
+ITM-FRIES,B-01,Crispy French Fries,110.00,REC-FRIES
+ITM-PATTY,B-01,Grilled Patty Solo,150.00,REC-PATTY
+ITM-NOODLES,B-02,Hakka Veg Noodles,250.00,REC-NOODLES
+ITM-ROLL,B-02,Crispy Spring Rolls,180.00,REC-ROLL

@@ -1,0 +1,11 @@
+kitchen_id,station_type,capacity
+K-01,GRILL,2
+K-01,FRYER,2
+K-01,WOK,2
+K-01,COLD,2
+K-01,BAKERY,1
+K-02,GRILL,2
+K-02,FRYER,2
+K-02,WOK,2
+K-02,COLD,2
+K-02,BAKERY,1

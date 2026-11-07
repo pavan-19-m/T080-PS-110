@@ -1,0 +1,6 @@
+recipe_id,station_type,prep_minutes,max_batch_size,dependency_recipe_id
+REC-PATTY,GRILL,8,4,
+REC-BURGER,COLD,3,2,REC-PATTY
+REC-FRIES,FRYER,5,3,
+REC-NOODLES,WOK,7,2,
+REC-ROLL,BAKERY,6,2,
