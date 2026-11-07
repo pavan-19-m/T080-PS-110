@@ -1,0 +1,4 @@
+brand_id,original_item_id,substitute_item_id
+B-02,ITM-NOODLES,ITM-RICE
+B-04,ITM-PASTRY,ITM-BROWNIE
+B-01,ITM-BURGER,ITM-WINGS

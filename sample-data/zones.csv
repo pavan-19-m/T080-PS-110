@@ -1,3 +1,5 @@
 zone_id,delivery_minutes,eligible_kitchen_ids
 ZONE-CENTRAL,15,K-01;K-02
-ZONE-EAST,20,K-02
+ZONE-EAST,20,K-01;K-03
+ZONE-SOUTH,25,K-02
+ZONE-TECH,18,K-03

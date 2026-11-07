@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.input.csv_loader import CsvLoader
+from src.loaders.csv_loader import CsvLoader
 from src.reporting.report_generator import ReportGenerator
 from src.services.order_service import OrderService
 
@@ -38,6 +38,12 @@ def run_pipeline(data_dir: Path, output_dir: Path) -> int:
         total_stations = sum(len(k.stations) for k in kitchens.values())
         print(f"  -> Loaded {len(kitchens)} physical kitchens with {total_stations} workstations")
 
+        substitutions = loader.load_substitutions()
+        print(f"  -> Loaded {len(substitutions)} brand substitution rules")
+
+        events = loader.load_events()
+        print(f"  -> Loaded {len(events)} lifecycle events")
+
         print("\n[2/5] Ingesting and validating incoming orders...")
         orders = loader.load_orders(brands, zones, menu_items, recipes)
         print(f"  -> Loaded and validated {len(orders)} customer orders")
@@ -49,8 +55,9 @@ def run_pipeline(data_dir: Path, output_dir: Path) -> int:
             menu_items=menu_items,
             recipes=recipes,
             zones=zones,
+            substitutions=substitutions,
         )
-        records = service.process_all_orders(orders)
+        records = service.process_all_orders(orders, events=events)
         print(f"  -> Successfully processed {len(records)} orders through pipeline")
 
         print("\n[4/5] Pipeline execution results:")
@@ -63,6 +70,8 @@ def run_pipeline(data_dir: Path, output_dir: Path) -> int:
         print("     - station_timelines.csv")
         print("     - order_financials.csv")
         print("     - daily_brand_pnl.csv")
+        print("     - kitchen_daily_reports.csv")
+        print("     - channel_reports.csv")
 
         print("\n Pipeline execution finished successfully.")
         return 0

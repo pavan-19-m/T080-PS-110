@@ -2,9 +2,17 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime, time
+from enum import Enum
 from typing import Dict, Set
 
 from src.models.station import Station, StationType
+
+
+class KitchenStatus(str, Enum):
+    """Operational status of a physical cloud kitchen."""
+    OPERATIONAL = "OPERATIONAL"
+    THROTTLED = "THROTTLED"
+    CLOSED = "CLOSED"
 
 
 @dataclass
@@ -18,6 +26,8 @@ class Kitchen:
     delivery_zones: Set[str] = field(default_factory=set)
     stations: Dict[StationType, Station] = field(default_factory=dict)
     is_throttled: bool = False
+    status: KitchenStatus = KitchenStatus.OPERATIONAL
+    stock_out: Set[str] = field(default_factory=set)
 
     def is_operating_at(self, dt: datetime) -> bool:
         """Check if kitchen is operating at the given datetime."""
@@ -46,3 +56,11 @@ class Kitchen:
     def get_current_load(self, at_time: datetime) -> float:
         """Calculate total remaining work minutes across all station slots at at_time."""
         return sum(st.get_remaining_load(at_time) for st in self.stations.values())
+
+    def mark_throttled(self) -> None:
+        self.is_throttled = True
+        self.status = KitchenStatus.THROTTLED
+
+    def clear_throttled(self) -> None:
+        self.is_throttled = False
+        self.status = KitchenStatus.OPERATIONAL

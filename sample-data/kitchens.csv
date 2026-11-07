@@ -1,3 +1,4 @@
 kitchen_id,name,open_time,close_time,supported_brands,delivery_zones
-K-01,Indiranagar Central Hub,08:00:00,23:30:00,B-01;B-02,ZONE-CENTRAL
-K-02,Koramangala South Hub,09:00:00,23:00:00,B-01;B-02,ZONE-CENTRAL;ZONE-EAST
+K-01,Indiranagar Central Hub,08:00:00,23:30:00,B-01;B-02;B-03;B-04,ZONE-CENTRAL;ZONE-EAST
+K-02,Koramangala South Hub,09:00:00,23:00:00,B-01;B-02;B-03;B-04,ZONE-CENTRAL;ZONE-SOUTH
+K-03,Whitefield Tech Hub,10:00:00,23:59:00,B-01;B-02;B-03,ZONE-EAST;ZONE-TECH

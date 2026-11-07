@@ -47,13 +47,17 @@ class Channel(str, Enum):
 class OrderStatus(str, Enum):
     """Order lifecycle status."""
     RECEIVED = "RECEIVED"
+    VALIDATED = "VALIDATED"
     ROUTED = "ROUTED"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
     READY = "READY"
     DISPATCHED = "DISPATCHED"
+    HANDED_OFF = "HANDED_OFF"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
+    REJECTED = "REJECTED"
+    LATE_RISK = "LATE_RISK"
 
 
 @dataclass
@@ -70,16 +74,27 @@ class Order:
     routing_reason: Optional[str] = None
     projected_ready_time: Optional[datetime] = None
     promised_time: Optional[datetime] = None
+    actual_handoff_time: Optional[datetime] = None
     late_risk: bool = False
     throttled_routing: bool = False
     rush_jumps_made: int = 0
     delayed_jumps_count: int = 0
     status: OrderStatus = OrderStatus.RECEIVED
+    cancellation_time: Optional[datetime] = None
+    cancellation_source: Optional[str] = None
+    cancellation_charge: float = 0.0
+    late_penalty: float = 0.0
+    penalty_cost_centre: str = "BRAND"
+    substitutions_applied: List[str] = field(default_factory=list)
 
     @property
     def gross_food_value(self) -> float:
         """Sum of prices across all active items."""
         return sum(item.price for item in self.items)
+
+    @property
+    def food_value(self) -> float:
+        return self.gross_food_value
 
     @property
     def is_rush(self) -> bool:
@@ -89,3 +104,18 @@ class Order:
     @property
     def item_count(self) -> int:
         return len(self.items)
+
+    def earliest_item_start_time(self) -> Optional[datetime]:
+        """Find the earliest preparation start time among all scheduled items."""
+        starts = [it.prep_start_time for it in self.items if it.prep_start_time is not None]
+        return min(starts) if starts else None
+
+    def has_prep_started_at(self, at_time: datetime) -> bool:
+        """
+        Check if food preparation has begun at or before at_time.
+        BR-08 / Edge case 6: The exact instant prep starts counts as started.
+        """
+        earliest = self.earliest_item_start_time()
+        if earliest is None:
+            return False
+        return earliest <= at_time

@@ -1,95 +1,41 @@
-"""Accounting engine implementing BR-09 channel economics and BR-11 brand-kitchen rent."""
+"""Accounting engine coordinating BR-09, BR-10, and BR-11 financial calculations."""
 
-from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
-from src.models import Channel, Order
-
-
-@dataclass
-class OrderFinancials:
-    """Financial breakdown of an individual order."""
-    order_id: str
-    channel: Channel
-    gross_food_value: float
-    commission_rate: float
-    commission_amount: float
-    fixed_fee: float
-    item_count: int
-    packaging_fee: float
-    gst_amount: float
-    customer_total: float
-    net_food_value: float
-    brand_earnings: float
-
-
-@dataclass
-class BrandDailyPnL:
-    """End-of-day P&L and kitchen lease settlement per brand per kitchen (BR-11)."""
-    brand_id: str
-    kitchen_id: str
-    order_count: int
-    gross_food_sales: float
-    platform_commissions: float
-    fixed_fees: float
-    net_food_sales: float
-    packaging_revenue: float
-    gst_collected: float
-    rent_orders_component: float  # Rs. 2 per order
-    rent_percentage_component: float  # 3% of net food value
-    raw_calculated_rent: float
-    minimum_rent_applied: bool
-    final_kitchen_rent: float
-    brand_net_profit: float
+from src.accounting.penalty_calculator import PenaltyCalculator
+from src.accounting.rent_calculator import RentCalculator, RentCalculationResult
+from src.models import (
+    BrandDailyPnL,
+    Channel,
+    ChannelReport,
+    CostCentre,
+    KitchenDailyReport,
+    Order,
+    OrderFinancials,
+)
 
 
 class AccountingEngine:
-    """Calculates channel commissions, packaging fees, GST (BR-09), and brand rent (BR-11)."""
+    """Coordinates financial calculations: commissions, packaging, GST, penalties, and kitchen rent."""
 
     PACKAGING_PER_ITEM: float = 10.0
     PACKAGING_CAP: float = 40.0
     GST_RATE: float = 0.05
 
-    # BR-11 Parameters
-    RENT_PER_ORDER: float = 2.0
-    RENT_PERCENTAGE_NET_FOOD: float = 0.03
-    RENT_MINIMUM_THRESHOLD_ORDERS: int = 30
-    RENT_MINIMUM_AMOUNT: float = 500.0
-
-    # BR-10 Parameters
-    PENALTY_PER_10_MIN_BLOCK: float = 50.0
-    PENALTY_CAP: float = 200.0
-
-    @classmethod
-    def calculate_late_penalty(
-        cls,
-        promised_time: datetime,
-        actual_handoff_time: datetime
-    ) -> float:
-        """
-        BR-10:
-        If hand-off occurs later than promised time, charge Rs. 50 per started
-        10 minutes of lateness, capped at Rs. 200.
-        1 to 10 min = Rs. 50; 11 to 20 min = Rs. 100; 21 to 30 min = Rs. 150; 31+ min = Rs. 200.
-        """
-        if actual_handoff_time <= promised_time:
-            return 0.0
-        delta_seconds = (actual_handoff_time - promised_time).total_seconds()
-        import math
-        lateness_minutes = delta_seconds / 60.0
-        blocks = math.ceil(lateness_minutes / 10.0)
-        raw_penalty = blocks * cls.PENALTY_PER_10_MIN_BLOCK
-        return min(raw_penalty, cls.PENALTY_CAP)
+    # BR-10 late penalty calculator delegate
+    calculate_late_penalty = PenaltyCalculator.calculate_penalty
 
     @classmethod
     def calculate_order_financials(cls, order: Order) -> OrderFinancials:
         """
         BR-09:
-        - Aggregator A commission: 22%.
-        - Aggregator B commission: 18%.
-        - Own app commission: 0% plus Rs. 15 payment fee.
-        - Packaging: Rs. 10 per item, capped at Rs. 40 per order.
+        - Aggregator A: 22% commission.
+        - Aggregator B: 18% commission.
+        - Own app: 0% commission + Rs. 15 payment fee.
+        - Packaging: Rs. 10 per item, maximum Rs. 40 per order.
         - GST: 5% on food.
+        - Edge Case 7: 5 items = 5 * 10 = Rs. 50, capped at Rs. 40.
         """
         food_value = order.gross_food_value
         channel = order.channel
@@ -107,6 +53,8 @@ class AccountingEngine:
         net_food_value = round(food_value - comm_amount, 2)
         brand_earnings = round(food_value - comm_amount - fixed_fee, 2)
 
+        cost_centre = CostCentre.KITCHEN if order.penalty_cost_centre == "KITCHEN" else CostCentre.BRAND
+
         return OrderFinancials(
             order_id=order.order_id,
             channel=channel,
@@ -120,6 +68,9 @@ class AccountingEngine:
             customer_total=customer_total,
             net_food_value=net_food_value,
             brand_earnings=brand_earnings,
+            late_penalty=order.late_penalty,
+            penalty_cost_centre=cost_centre,
+            cancellation_charge=order.cancellation_charge,
         )
 
     @classmethod
@@ -128,12 +79,10 @@ class AccountingEngine:
         order_records: List[Tuple[Order, OrderFinancials]]
     ) -> List[BrandDailyPnL]:
         """
-        BR-11:
-        Each brand pays the kitchen Rs. 2 per order plus 3% of net food value.
-        If a brand has fewer than 30 orders per day at a kitchen (< 30), apply a Rs. 500 minimum.
-        Exactly 30 orders does not qualify for the minimum.
+        BR-11 & BR-10:
+        Calculates daily P&L per brand per kitchen, deducting platform commissions,
+        fixed fees, kitchen rent, and late delivery penalties.
         """
-        # Group by (brand_id, kitchen_id)
         grouped: Dict[Tuple[str, str], List[Tuple[Order, OrderFinancials]]] = {}
         for order, fin in order_records:
             kitchen_id = order.assigned_kitchen_id or "UNASSIGNED"
@@ -150,23 +99,22 @@ class AccountingEngine:
             pkg_total = sum(f.packaging_fee for _, f in records)
             gst_total = sum(f.gst_amount for _, f in records)
 
-            # BR-11 Rent: Rs. 2 per order + 3% of net food value
-            rent_order_comp = round(order_count * cls.RENT_PER_ORDER, 2)
-            rent_pct_comp = round(net_food * cls.RENT_PERCENTAGE_NET_FOOD, 2)
-            raw_rent = round(rent_order_comp + rent_pct_comp, 2)
+            # BR-10 Penalties absorbed by brand
+            brand_penalties = sum(
+                f.late_penalty for _, f in records
+                if f.penalty_cost_centre == CostCentre.BRAND
+            )
 
-            # Minimum check: < 30 orders qualifies for Rs. 500 minimum; exactly 30 does NOT.
-            min_applied = False
-            if kitchen_id != "UNASSIGNED" and order_count < cls.RENT_MINIMUM_THRESHOLD_ORDERS:
-                if raw_rent < cls.RENT_MINIMUM_AMOUNT:
-                    final_rent = cls.RENT_MINIMUM_AMOUNT
-                    min_applied = True
-                else:
-                    final_rent = raw_rent
-            else:
-                final_rent = raw_rent
+            # BR-11 Rent calculation
+            rent_res: RentCalculationResult = RentCalculator.calculate_rent(
+                order_count=order_count,
+                net_food_sales=net_food,
+                is_assigned_kitchen=(kitchen_id != "UNASSIGNED"),
+            )
 
-            brand_net_profit = round(net_food - fixed_fees - final_rent, 2)
+            brand_net_profit = round(
+                net_food - fixed_fees - rent_res.final_rent - brand_penalties, 2
+            )
 
             pnl_results.append(
                 BrandDailyPnL(
@@ -179,13 +127,80 @@ class AccountingEngine:
                     net_food_sales=net_food,
                     packaging_revenue=pkg_total,
                     gst_collected=gst_total,
-                    rent_orders_component=rent_order_comp,
-                    rent_percentage_component=rent_pct_comp,
-                    raw_calculated_rent=raw_rent,
-                    minimum_rent_applied=min_applied,
-                    final_kitchen_rent=final_rent,
+                    rent_orders_component=rent_res.order_component,
+                    rent_percentage_component=rent_res.percentage_component,
+                    raw_calculated_rent=rent_res.raw_rent,
+                    minimum_rent_applied=rent_res.minimum_rent_applied,
+                    final_kitchen_rent=rent_res.final_rent,
+                    penalties_absorbed=brand_penalties,
                     brand_net_profit=brand_net_profit,
                 )
             )
 
         return pnl_results
+
+    @classmethod
+    def calculate_kitchen_daily_reports(
+        cls,
+        pnl_records: List[BrandDailyPnL],
+        order_records: List[Tuple[Order, OrderFinancials]]
+    ) -> List[KitchenDailyReport]:
+        """Compiles daily operational performance reports per kitchen facility."""
+        kitchen_pnl: Dict[str, List[BrandDailyPnL]] = {}
+        for pnl in pnl_records:
+            kitchen_pnl.setdefault(pnl.kitchen_id, []).append(pnl)
+
+        reports: List[KitchenDailyReport] = []
+        for kitchen_id, pnl_list in sorted(kitchen_pnl.items()):
+            total_orders = sum(p.order_count for p in pnl_list)
+            total_rent = sum(p.final_kitchen_rent for p in pnl_list)
+            min_rent_count = sum(1 for p in pnl_list if p.minimum_rent_applied)
+
+            # Penalties charged to kitchen cost centre
+            kitchen_penalties = sum(
+                f.late_penalty for order, f in order_records
+                if order.assigned_kitchen_id == kitchen_id and f.penalty_cost_centre == CostCentre.KITCHEN
+            )
+
+            net_income = round(total_rent - kitchen_penalties, 2)
+            reports.append(
+                KitchenDailyReport(
+                    kitchen_id=kitchen_id,
+                    total_orders_handled=total_orders,
+                    total_revenue_rent=total_rent,
+                    minimum_rent_count=min_rent_count,
+                    penalties_charged=kitchen_penalties,
+                    net_kitchen_income=net_income,
+                    total_operating_minutes=0.0,
+                )
+            )
+        return reports
+
+    @classmethod
+    def calculate_channel_reports(
+        cls,
+        order_records: List[Tuple[Order, OrderFinancials]]
+    ) -> List[ChannelReport]:
+        """Summarizes platform orders, gross GMV, commissions and fixed fees by channel."""
+        grouped: Dict[Channel, List[OrderFinancials]] = {}
+        for _, f in order_records:
+            grouped.setdefault(f.channel, []).append(f)
+
+        reports: List[ChannelReport] = []
+        for channel, fin_list in sorted(grouped.items(), key=lambda x: x[0].value):
+            count = len(fin_list)
+            gross = sum(f.gross_food_value for f in fin_list)
+            comm = sum(f.commission_amount for f in fin_list)
+            fees = sum(f.fixed_fee for f in fin_list)
+            gst = sum(f.gst_amount for f in fin_list)
+            reports.append(
+                ChannelReport(
+                    channel=channel,
+                    order_count=count,
+                    total_gross_value=gross,
+                    total_commissions_earned=comm,
+                    total_fixed_fees_earned=fees,
+                    total_gst_processed=gst,
+                )
+            )
+        return reports

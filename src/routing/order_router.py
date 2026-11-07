@@ -12,7 +12,8 @@ from src.models import (
     Recipe,
     StationType,
 )
-from src.scheduling.scheduler import ScheduleOutcome, StationScheduler
+from src.routing.kitchen_eligibility import KitchenEligibilityChecker
+from src.scheduling.station_scheduler import ScheduleOutcome, StationScheduler
 
 
 @dataclass
@@ -49,7 +50,7 @@ class OrderRouter:
         second = raw.second
         micro = raw.microsecond
 
-        # Check if already exact 5-minute boundary
+        # Check if already exact 5-minute boundary with 0 seconds
         if minute % 5 == 0 and second == 0 and micro == 0:
             return raw
 
@@ -64,39 +65,13 @@ class OrderRouter:
         zone: DeliveryZone,
         recipes: Dict[str, Recipe]
     ) -> List[Kitchen]:
-        """
-        BR-01: A kitchen is eligible only if:
-        1. It serves the brand.
-        2. It is listed in the delivery zone's kitchen list.
-        3. It is operating at the order time.
-        4. It has every required station.
-        """
-        required_stations: Set[StationType] = set()
-        for it in order.items:
-            rec = recipes.get(it.recipe_id)
-            if rec:
-                required_stations.add(rec.station_type)
-
-        eligible: List[Kitchen] = []
-        for k_id, kitchen in all_kitchens.items():
-            # Check delivery zone inclusion
-            if not zone.serves_kitchen(k_id):
-                continue
-            # Check brand partnership
-            if not kitchen.supports_brand(order.brand_id):
-                continue
-            # Check operating hours
-            if not kitchen.is_operating_at(order.order_time):
-                continue
-            # Check required stations
-            if not kitchen.has_all_stations(required_stations):
-                continue
-
-            # Check BR-06 Throttling: Throttled kitchen accepts ONLY if it is sole eligible kitchen
-            # We first collect all physically eligible kitchens, then filter throttled kitchens if non-throttled exist
-            eligible.append(kitchen)
-
-        return eligible
+        """BR-01: Finds eligible kitchens using KitchenEligibilityChecker."""
+        return KitchenEligibilityChecker.find_eligible_kitchens(
+            order=order,
+            all_kitchens=all_kitchens,
+            zone=zone,
+            recipes=recipes,
+        )
 
     def filter_throttling(
         self,
@@ -106,21 +81,23 @@ class OrderRouter:
         """
         BR-06: A throttled kitchen accepts only orders for which it is the sole eligible kitchen.
         If non-throttled eligible kitchens exist, throttled kitchens are excluded.
-        Also clears throttling if load falls below 40 minutes.
+        Clears throttling if current load or projected ready delay falls below 40 minutes (< 40).
         """
-        # First check clearance of throttling
         for k in eligible:
             if k.is_throttled:
                 curr_load = k.get_current_load(at_time)
                 if curr_load < self.THROTTLE_CLEAR_MINUTES:
-                    k.is_throttled = False
+                    k.clear_throttled()
 
         non_throttled = [k for k in eligible if not k.is_throttled]
         if non_throttled:
             return non_throttled
 
-        # If only throttled kitchens exist, they may accept because it's sole eligible pool
-        return eligible
+        # If only throttled kitchens exist, they accept only if sole eligible kitchen
+        if len(eligible) == 1:
+            return eligible
+
+        return []
 
     def route_order(
         self,
@@ -131,18 +108,35 @@ class OrderRouter:
     ) -> RoutingEvaluation:
         """
         Full routing execution according to BR-01, BR-05, and BR-06.
+        Rule Precedence (BR-12):
+        1. Eligibility
+        2. Throttling
+        3. Routing based on projected ready time
+        ...
+        7. Promised-time calculation
         """
         raw_eligible = self.find_eligible_kitchens(order, all_kitchens, zone, recipes)
         if not raw_eligible:
+            order.status = OrderStatus.REJECTED
+            order.routing_reason = "No eligible kitchen found meeting brand, zone, operating hours, and station criteria"
             return RoutingEvaluation(
                 selected_kitchen_id=None,
-                routing_reason="No eligible kitchen found meeting brand, zone, operating hours, and station criteria",
+                routing_reason=order.routing_reason,
                 projected_ready_time=None,
                 promised_time=None,
             )
 
         # Apply BR-06 throttling filtering
         filtered_eligible = self.filter_throttling(raw_eligible, order.order_time)
+        if not filtered_eligible:
+            order.status = OrderStatus.REJECTED
+            order.routing_reason = "All eligible kitchens are throttled and none is sole eligible"
+            return RoutingEvaluation(
+                selected_kitchen_id=None,
+                routing_reason=order.routing_reason,
+                projected_ready_time=None,
+                promised_time=None,
+            )
 
         # Simulate ready time and load for each eligible candidate
         candidates: List[Tuple[Kitchen, ScheduleOutcome, float]] = []
@@ -166,6 +160,7 @@ class OrderRouter:
 
         # BR-05: Late Risk & Reroute Evaluation
         time_to_ready_minutes = (final_ready_time - order.order_time).total_seconds() / 60.0
+        # Edge Case 3: Exactly 45 minutes does NOT exceed 45 minutes (> 45.0)
         if time_to_ready_minutes > self.LATE_RISK_THRESHOLD_MINUTES:
             # Check alternative kitchens
             alternative_found = False
@@ -186,11 +181,12 @@ class OrderRouter:
                 routing_reason += f" [Accepted with LATE_RISK: prep time {time_to_ready_minutes:.1f}m > 45m]"
 
         # BR-06: Throttling Trigger Check on Selected Kitchen
+        # Edge Case 4: Kitchen load exactly 60 minutes does NOT exceed 60 minutes (> 60.0)
         new_ready_delay = (final_ready_time - order.order_time).total_seconds() / 60.0
         if new_ready_delay > self.THROTTLE_TRIGGER_MINUTES:
-            selected_kitchen.is_throttled = True
+            selected_kitchen.mark_throttled()
 
-        # Calculate promised time
+        # Calculate promised time (BR-05)
         promised_time = self.calculate_promised_time(final_ready_time, zone.delivery_minutes)
 
         # Update order entity

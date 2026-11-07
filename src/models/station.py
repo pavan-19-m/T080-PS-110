@@ -31,6 +31,7 @@ class SlotBooking:
     start_time: datetime
     end_time: datetime
     batch_id: Optional[str] = None
+    slot_id: int = 1
 
 
 @dataclass
@@ -81,6 +82,7 @@ class Station:
     station_type: StationType
     capacity: int
     slots: List[StationSlot] = field(default_factory=list)
+    station_id: Optional[str] = None
 
     def __post_init__(self):
         if not self.slots and self.capacity > 0:

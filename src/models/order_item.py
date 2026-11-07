@@ -13,6 +13,7 @@ class OrderItem:
     item_id: str
     price: float
     recipe_id: str
+    brand_id: Optional[str] = None
     prep_start_time: Optional[datetime] = None
     prep_end_time: Optional[datetime] = None
     slot_id: Optional[int] = None

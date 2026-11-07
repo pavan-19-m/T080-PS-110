@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 
 from src.accounting.accounting_engine import AccountingEngine, BrandDailyPnL
+from src.models import ChannelReport, KitchenDailyReport
 from src.services.order_service import ProcessedOrderRecord
 
 
@@ -13,7 +14,7 @@ class ReportGenerator:
 
     @classmethod
     def print_terminal_summary(cls, records: List[ProcessedOrderRecord]) -> None:
-        """Print comprehensive order matrix, station timeline, and brand P&L report."""
+        """Print comprehensive order matrix, station timeline, brand P&L, and kitchen summary."""
         sep_double = "=" * 115
         sep_single = "-" * 115
 
@@ -68,6 +69,9 @@ class ReportGenerator:
                 promised_str = o.promised_time.strftime('%H:%M:%S')
                 print(f"  Schedule Timing: Ready = {ready_str} (incl. 3m packaging) | Promised Delivery = {promised_str}")
 
+            if o.substitutions_applied:
+                print(f"  Substitutions / Adjustments: {', '.join(o.substitutions_applied)}")
+
             print("  Station Timeline & Item Slots:")
             for item in o.items:
                 start_str = item.prep_start_time.strftime('%H:%M:%S') if item.prep_start_time else "N/A"
@@ -76,9 +80,11 @@ class ReportGenerator:
                 slot_str = f"Slot #{item.slot_id}" if item.slot_id else "Slot N/A"
                 print(f"    - {item.item_id} (Recipe: {item.recipe_id}): {start_str} -> {end_str} [{slot_str}, {batch_str}]")
 
-            print("  Financials (BR-09):")
+            print("  Financials (BR-09, BR-10):")
+            penalty_str = f" | Late Penalty: Rs. {f.late_penalty:.2f} ({f.penalty_cost_centre.value})" if f.late_penalty > 0 else ""
+            cancel_str = f" | Cancel Charge: Rs. {f.cancellation_charge:.2f}" if f.cancellation_charge > 0 else ""
             print(f"    Food Value: Rs. {f.gross_food_value:.2f} | Commission ({f.commission_rate*100:.0f}%): Rs. {f.commission_amount:.2f} | Fixed Fee: Rs. {f.fixed_fee:.2f}")
-            print(f"    Packaging: Rs. {f.packaging_fee:.2f} (cap Rs.40) | GST (5%): Rs. {f.gst_amount:.2f} | Customer Total: Rs. {f.customer_total:.2f}")
+            print(f"    Packaging: Rs. {f.packaging_fee:.2f} (cap Rs.40) | GST (5%): Rs. {f.gst_amount:.2f} | Customer Total: Rs. {f.customer_total:.2f}{penalty_str}{cancel_str}")
 
         # 3. END-OF-DAY BRAND P&L AND RENT SETTLEMENT (BR-11)
         pnl_records = AccountingEngine.calculate_daily_brand_pnl(
@@ -98,6 +104,34 @@ class ReportGenerator:
 
         print(sep_single)
         print("  BR-11 Rent Formula: Rs. 2/order + 3% of net food value (Rs. 500 minimum if daily orders < 30).")
+
+        # 4. KITCHEN DAILY PERFORMANCE SUMMARY
+        kitchen_reports = AccountingEngine.calculate_kitchen_daily_reports(
+            pnl_records=pnl_records,
+            order_records=[(rec.order, rec.financials) for rec in records]
+        )
+        print("\n" + sep_single)
+        print(">>> KITCHEN DAILY OPERATIONS & RENT REVENUE REPORT")
+        print(sep_single)
+        k_header = f"{'Kitchen ID':<12} {'Orders Handled':<16} {'Rental Revenue':<16} {'Min Rent Triggers':<20} {'Penalties Charged':<18} {'Net Income':<14}"
+        print(k_header)
+        print(sep_single)
+        for kr in kitchen_reports:
+            print(f"{kr.kitchen_id:<12} {kr.total_orders_handled:<16} Rs.{kr.total_revenue_rent:<14.2f} {kr.minimum_rent_count:<20} Rs.{kr.penalties_charged:<16.2f} Rs.{kr.net_kitchen_income:<14.2f}")
+
+        # 5. CHANNEL COMMISSIONS REPORT
+        channel_reports = AccountingEngine.calculate_channel_reports(
+            [(rec.order, rec.financials) for rec in records]
+        )
+        print("\n" + sep_single)
+        print(">>> ORDERING PLATFORM CHANNEL REPORT (BR-09)")
+        print(sep_single)
+        c_header = f"{'Channel':<15} {'Orders':<8} {'Gross GMV':<14} {'Commissions':<14} {'Fixed Fees':<12} {'GST Handled':<12}"
+        print(c_header)
+        print(sep_single)
+        for cr in channel_reports:
+            print(f"{cr.channel.value:<15} {cr.order_count:<8} Rs.{cr.total_gross_value:<12.2f} Rs.{cr.total_commissions_earned:<12.2f} Rs.{cr.total_fixed_fees_earned:<10.2f} Rs.{cr.total_gst_processed:<10.2f}")
+
         print(sep_double + "\n")
 
     @classmethod
@@ -195,6 +229,9 @@ class ReportGenerator:
                 "customer_total",
                 "net_food_value",
                 "brand_earnings",
+                "late_penalty",
+                "penalty_cost_centre",
+                "cancellation_charge",
             ])
             for rec in records:
                 f_data = rec.financials
@@ -211,6 +248,9 @@ class ReportGenerator:
                     f_data.customer_total,
                     f_data.net_food_value,
                     f_data.brand_earnings,
+                    f_data.late_penalty,
+                    f_data.penalty_cost_centre.value,
+                    f_data.cancellation_charge,
                 ])
 
         # 4. Daily Brand P&L CSV (BR-11)
@@ -235,6 +275,7 @@ class ReportGenerator:
                 "raw_calculated_rent",
                 "minimum_rent_applied",
                 "final_kitchen_rent",
+                "penalties_absorbed",
                 "brand_net_profit",
             ])
             for p in pnl_records:
@@ -253,5 +294,57 @@ class ReportGenerator:
                     p.raw_calculated_rent,
                     p.minimum_rent_applied,
                     p.final_kitchen_rent,
+                    p.penalties_absorbed,
                     p.brand_net_profit,
+                ])
+
+        # 5. Kitchen Daily Reports CSV
+        kitchen_reports_file = output_dir / "kitchen_daily_reports.csv"
+        kitchen_reports = AccountingEngine.calculate_kitchen_daily_reports(
+            pnl_records=pnl_records,
+            order_records=[(rec.order, rec.financials) for rec in records]
+        )
+        with open(kitchen_reports_file, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "kitchen_id",
+                "total_orders_handled",
+                "total_revenue_rent",
+                "minimum_rent_count",
+                "penalties_charged",
+                "net_kitchen_income",
+            ])
+            for kr in kitchen_reports:
+                writer.writerow([
+                    kr.kitchen_id,
+                    kr.total_orders_handled,
+                    kr.total_revenue_rent,
+                    kr.minimum_rent_count,
+                    kr.penalties_charged,
+                    kr.net_kitchen_income,
+                ])
+
+        # 6. Channel Reports CSV
+        channel_reports_file = output_dir / "channel_reports.csv"
+        channel_reports = AccountingEngine.calculate_channel_reports(
+            [(rec.order, rec.financials) for rec in records]
+        )
+        with open(channel_reports_file, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "channel",
+                "order_count",
+                "total_gross_value",
+                "total_commissions_earned",
+                "total_fixed_fees_earned",
+                "total_gst_processed",
+            ])
+            for cr in channel_reports:
+                writer.writerow([
+                    cr.channel.value,
+                    cr.order_count,
+                    cr.total_gross_value,
+                    cr.total_commissions_earned,
+                    cr.total_fixed_fees_earned,
+                    cr.total_gst_processed,
                 ])

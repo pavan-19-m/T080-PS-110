@@ -1,0 +1,6 @@
+event_id,event_type,timestamp,order_id,kitchen_id,item_id,source,details
+EV-01,STOCK_OUT,2026-11-06 11:55:00,,K-01,ITM-NOODLES,,Stock out at Indiranagar kitchen
+EV-02,CANCEL,2026-11-06 12:01:00,ORD-101,,,CUSTOMER,Customer cancellation before prep starts
+EV-03,CANCEL,2026-11-06 12:12:00,ORD-104,,,AGGREGATOR_A,Aggregator cancellation after prep started
+EV-04,HANDOFF,2026-11-06 12:45:00,ORD-102,,,CHANNEL,Hand-off 15 min late
+EV-05,END_OF_DAY,2026-11-06 23:59:00,,,,EOD,Daily reconciliation close

@@ -2,5 +2,13 @@ item_id,brand_id,name,price,recipe_id
 ITM-BURGER,B-01,Classic Cheeseburger,220.00,REC-BURGER
 ITM-FRIES,B-01,Crispy French Fries,110.00,REC-FRIES
 ITM-PATTY,B-01,Grilled Patty Solo,150.00,REC-PATTY
+ITM-WINGS,B-01,Spicy Chicken Wings,260.00,REC-WINGS
 ITM-NOODLES,B-02,Hakka Veg Noodles,250.00,REC-NOODLES
+ITM-RICE,B-02,Schezwan Fried Rice,240.00,REC-RICE
 ITM-ROLL,B-02,Crispy Spring Rolls,180.00,REC-ROLL
+ITM-PIZZA,B-03,Farmhouse Artisan Pizza,380.00,REC-PIZZA
+ITM-GARLICBREAD,B-03,Cheesy Garlic Bread,160.00,REC-GARLICBREAD
+ITM-DOUGH,B-03,Bakery Crust Breadsticks,90.00,REC-DOUGH
+ITM-PASTRY,B-04,Belgian Chocolate Pastry,140.00,REC-PASTRY
+ITM-BROWNIE,B-04,Warm Walnut Brownie,160.00,REC-BROWNIE
+ITM-SALAD,B-04,Mediterranean Fresh Salad,150.00,REC-SALAD
