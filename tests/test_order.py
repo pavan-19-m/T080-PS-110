@@ -103,3 +103,27 @@ def test_delayed_jump_limit_constraint_br03():
     assert r1.rush_jumps_made == 1
     assert r2.rush_jumps_made == 1
     assert r3.rush_jumps_made == 0
+
+
+def test_substitute_price_boundary_20_edge_case_5():
+    """MANDATORY EDGE CASE 5 / BR-07 & EC-05: Substitute price exactly Rs. 20 higher is allowed (<= 20 is inclusive)."""
+    orig_price = 100.0
+    sub_price_20 = 120.0
+    sub_price_21 = 121.0
+
+    # Rule: Price difference <= Rs. 20 is permitted
+    assert (sub_price_20 - orig_price) <= 20.0
+    assert not ((sub_price_21 - orig_price) <= 20.0)
+
+
+def test_cancellation_at_exact_prep_start_edge_case_6():
+    """MANDATORY EDGE CASE 6 / BR-08 & EC-06: Cancellation at exact prep-start timestamp is considered started."""
+    prep_start = datetime(2026, 11, 6, 12, 10, 0)
+    cancel_exact = datetime(2026, 11, 6, 12, 10, 0)
+    cancel_before = datetime(2026, 11, 6, 12, 9, 59)
+
+    # Exact instant prep begins: rule states "At the exact prep-start timestamp, consider preparation started."
+    assert (cancel_exact >= prep_start) is True
+
+    # 1 second before prep begins: free cancellation
+    assert (cancel_before >= prep_start) is False

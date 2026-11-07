@@ -56,6 +56,31 @@ class AccountingEngine:
     RENT_MINIMUM_THRESHOLD_ORDERS: int = 30
     RENT_MINIMUM_AMOUNT: float = 500.0
 
+    # BR-10 Parameters
+    PENALTY_PER_10_MIN_BLOCK: float = 50.0
+    PENALTY_CAP: float = 200.0
+
+    @classmethod
+    def calculate_late_penalty(
+        cls,
+        promised_time: datetime,
+        actual_handoff_time: datetime
+    ) -> float:
+        """
+        BR-10:
+        If hand-off occurs later than promised time, charge Rs. 50 per started
+        10 minutes of lateness, capped at Rs. 200.
+        1 to 10 min = Rs. 50; 11 to 20 min = Rs. 100; 21 to 30 min = Rs. 150; 31+ min = Rs. 200.
+        """
+        if actual_handoff_time <= promised_time:
+            return 0.0
+        delta_seconds = (actual_handoff_time - promised_time).total_seconds()
+        import math
+        lateness_minutes = delta_seconds / 60.0
+        blocks = math.ceil(lateness_minutes / 10.0)
+        raw_penalty = blocks * cls.PENALTY_PER_10_MIN_BLOCK
+        return min(raw_penalty, cls.PENALTY_CAP)
+
     @classmethod
     def calculate_order_financials(cls, order: Order) -> OrderFinancials:
         """

@@ -130,3 +130,24 @@ def test_brand_kitchen_rent_exactly_30_orders_edge_case_8():
     assert pnl.minimum_rent_applied is False
     assert pnl.final_kitchen_rent == 130.20  # Minimum Rs. 500 NOT applied!
 
+
+def test_late_delivery_penalty_11_minutes_br10():
+    """BR-10 & T-BR10-01: Hand-off 11 minutes late incurs Rs. 100 penalty (2 started 10-min blocks)."""
+    prom = datetime(2026, 11, 6, 12, 30, 0)
+    # 11 minutes late -> 12:41:00
+    actual = datetime(2026, 11, 6, 12, 41, 0)
+    penalty = AccountingEngine.calculate_late_penalty(prom, actual)
+    assert penalty == 100.0  # 2 * 50
+
+    # 5 minutes late -> 1 block = Rs. 50
+    penalty_5 = AccountingEngine.calculate_late_penalty(prom, datetime(2026, 11, 6, 12, 35, 0))
+    assert penalty_5 == 50.0
+
+    # 45 minutes late -> capped at Rs. 200
+    penalty_45 = AccountingEngine.calculate_late_penalty(prom, datetime(2026, 11, 6, 13, 15, 0))
+    assert penalty_45 == 200.0
+
+    # On time -> Rs. 0
+    penalty_ontime = AccountingEngine.calculate_late_penalty(prom, prom)
+    assert penalty_ontime == 0.0
+

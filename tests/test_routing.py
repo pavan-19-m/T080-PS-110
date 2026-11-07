@@ -210,3 +210,64 @@ def test_throttling_br06(base_recipes, base_zone):
 
     res = router.route_order(order, {"K-01": k1}, base_zone, super_long_recipe)
     assert k1.is_throttled is True
+
+
+def test_projected_ready_time_exactly_45_minutes_edge_case_3(base_recipes, base_zone):
+    """MANDATORY EDGE CASE 3 / EC-03: Projected ready time exactly 45 min does NOT trigger LATE_RISK."""
+    router = OrderRouter()
+    # 42 min prep + 3 min packaging = exactly 45 minutes from order time
+    exact_45_recipe = {"REC-42": Recipe(recipe_id="REC-42", station_type=StationType.GRILL, prep_minutes=42)}
+
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Hub",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"B-1"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=1)},
+    )
+
+    order = Order(
+        order_id="ORD-EXACT45",
+        brand_id="B-1",
+        items=[OrderItem("1", "ORD-EXACT45", "ITM-1", 150, "REC-42")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+
+    res = router.route_order(order, {"K-01": k1}, base_zone, exact_45_recipe)
+    # Exactly 45 min does NOT exceed 45 minutes (45 > 45 is False)
+    assert res.late_risk is False
+    assert order.late_risk is False
+
+
+def test_kitchen_load_exactly_60_minutes_edge_case_4(base_recipes, base_zone):
+    """MANDATORY EDGE CASE 4 / EC-04: Kitchen projected load exactly 60 min does NOT trigger THROTTLED."""
+    router = OrderRouter()
+    # 57 min prep + 3 min packaging = exactly 60 minutes from order time
+    exact_60_recipe = {"REC-57": Recipe(recipe_id="REC-57", station_type=StationType.GRILL, prep_minutes=57)}
+
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Hub",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"B-1"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=1)},
+    )
+
+    order = Order(
+        order_id="ORD-EXACT60",
+        brand_id="B-1",
+        items=[OrderItem("1", "ORD-EXACT60", "ITM-1", 200, "REC-57")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+
+    res = router.route_order(order, {"K-01": k1}, base_zone, exact_60_recipe)
+    # Exactly 60 min does NOT exceed 60 minutes (60 > 60 is False)
+    assert k1.is_throttled is False
