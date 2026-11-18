@@ -151,3 +151,32 @@ def test_late_delivery_penalty_11_minutes_br10():
     penalty_ontime = AccountingEngine.calculate_late_penalty(prom, prom)
     assert penalty_ontime == 0.0
 
+
+def test_late_delivery_penalty_1_minute_br10():
+    """BR-10: 1 minute late starts first 10-minute block -> Rs. 50."""
+    prom = datetime(2026, 11, 6, 12, 0, 0)
+    actual = datetime(2026, 11, 6, 12, 1, 0)
+    assert AccountingEngine.calculate_late_penalty(prom, actual) == 50.0
+
+
+def test_late_delivery_penalty_10_minutes_br10():
+    """BR-10: Exactly 10 minutes late -> exactly 1 block -> Rs. 50."""
+    prom = datetime(2026, 11, 6, 12, 0, 0)
+    actual = datetime(2026, 11, 6, 12, 10, 0)
+    assert AccountingEngine.calculate_late_penalty(prom, actual) == 50.0
+
+
+def test_late_delivery_penalty_40_minutes_br10():
+    """BR-10: 40 minutes late -> 4 blocks -> Rs. 200 (hits maximum cap)."""
+    prom = datetime(2026, 11, 6, 12, 0, 0)
+    actual = datetime(2026, 11, 6, 12, 40, 0)
+    assert AccountingEngine.calculate_late_penalty(prom, actual) == 200.0
+
+
+def test_late_delivery_penalty_cap_exceeded_br10():
+    """BR-10: 60 minutes late -> 6 blocks (Rs. 300) -> capped at Rs. 200."""
+    prom = datetime(2026, 11, 6, 12, 0, 0)
+    actual = datetime(2026, 11, 6, 13, 0, 0)
+    assert AccountingEngine.calculate_late_penalty(prom, actual) == 200.0
+
+

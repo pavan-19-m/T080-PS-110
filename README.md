@@ -1,7 +1,7 @@
 # Cloud Kitchen Multi-Brand Order Routing and Kitchen Capacity Engine
 
 **Capstone Project | Team ID:** T080 | **Problem Statement:** PS-110  
-**Team Members:** Pavan Neelappa Mirji & Padmavathi B  
+**Team Members:** Padmavathi B (1AT24CG059) & Pavan Neelappa Mirji (1AT24CG060)  
 **Academic Section:** CSD  
 **Language:** Python 3.10+  
 
@@ -155,7 +155,7 @@ T080-PS-110/
 │   └── reporting/                     # Console outputs and CSV exporters
 │       ├── __init__.py
 │       └── report_generator.py        # CLI matrix and 6 CSV report writers
-├── tests/                             # Comprehensive pytest test suite (67 passed tests)
+├── tests/                             # Comprehensive pytest test suite (83 passed tests)
 │   ├── __init__.py
 │   ├── test_models.py                 # Core domain model tests
 │   ├── test_validation.py             # Schema and referential integrity tests
@@ -252,7 +252,7 @@ python main.py
 
 ## 13. Testing Instructions
 
-Run all 67 automated unit and integration tests using pytest:
+Run all 83 automated unit and integration tests using pytest:
 ```powershell
 python -m pytest -v
 ```
@@ -326,6 +326,6 @@ ORD-104    B-01         AGGREGATOR_A  K-02     12:06:00  12:17:00  12:40:00  Rs.
 - **Capstone Team ID:** T080  
 - **Problem Statement ID:** PS-110  
 - **Team Members:**
-  1. **Pavan Neelappa Mirji**
-  2. **Padmavathi B**
+  1. **Padmavathi B** – 1AT24CG059
+  2. **Pavan Neelappa Mirji** – 1AT24CG060
 - **Academic Section:** CSD  

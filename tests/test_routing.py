@@ -9,6 +9,7 @@ from src.models import (
     Kitchen,
     Order,
     OrderItem,
+    OrderStatus,
     Recipe,
     Station,
     StationType,
@@ -271,3 +272,153 @@ def test_kitchen_load_exactly_60_minutes_edge_case_4(base_recipes, base_zone):
     res = router.route_order(order, {"K-01": k1}, base_zone, exact_60_recipe)
     # Exactly 60 min does NOT exceed 60 minutes (60 > 60 is False)
     assert k1.is_throttled is False
+
+
+def test_routing_kitchen_closed_at_order_time(base_recipes, base_zone):
+    """BR-01: Kitchen is not eligible if order timestamp falls outside operating hours."""
+    router = OrderRouter()
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Day Hub",
+        open_time=time(9, 0),
+        close_time=time(21, 0),
+        supported_brands={"BRAND-X"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=2)},
+    )
+    # Order at 22:30 (closed)
+    order = Order(
+        order_id="ORD-NIGHT",
+        brand_id="BRAND-X",
+        items=[OrderItem("1", "ORD-NIGHT", "ITM-1", 100, "REC-GRILL")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 22, 30, 0),
+    )
+    eligible = router.find_eligible_kitchens(order, {"K-01": k1}, base_zone, base_recipes)
+    assert len(eligible) == 0
+
+    res = router.route_order(order, {"K-01": k1}, base_zone, base_recipes)
+    assert res.selected_kitchen_id is None
+    assert order.status == OrderStatus.REJECTED
+
+
+def test_routing_kitchen_missing_required_station(base_zone):
+    """BR-01: Kitchen is not eligible if it lacks a station required by order items."""
+    router = OrderRouter()
+    wok_recipes = {
+        "REC-WOK": Recipe(recipe_id="REC-WOK", station_type=StationType.WOK, prep_minutes=8)
+    }
+    # Kitchen only has GRILL, lacks WOK
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Grill Only",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"BRAND-X"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=1)},
+    )
+    order = Order(
+        order_id="ORD-WOK",
+        brand_id="BRAND-X",
+        items=[OrderItem("1", "ORD-WOK", "ITM-WOK", 120, "REC-WOK")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+    eligible = router.find_eligible_kitchens(order, {"K-01": k1}, base_zone, wok_recipes)
+    assert len(eligible) == 0
+
+
+def test_routing_kitchen_not_serving_brand(base_recipes, base_zone):
+    """BR-01: Kitchen is not eligible if it does not support the requested brand."""
+    router = OrderRouter()
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Burger Joint Hub",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"BRAND-A"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=2)},
+    )
+    order = Order(
+        order_id="ORD-BRAND-B",
+        brand_id="BRAND-B",
+        items=[OrderItem("1", "ORD-BRAND-B", "ITM-1", 100, "REC-GRILL")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+    eligible = router.find_eligible_kitchens(order, {"K-01": k1}, base_zone, base_recipes)
+    assert len(eligible) == 0
+
+
+def test_routing_kitchen_not_in_delivery_zone(base_recipes):
+    """BR-01: Kitchen is not eligible if not listed in delivery zone."""
+    router = OrderRouter()
+    zone = DeliveryZone(zone_id="ZONE-REMOTE", delivery_minutes=25, eligible_kitchen_ids={"K-99"})
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Hub 1",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"BRAND-X"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=2)},
+    )
+    order = Order(
+        order_id="ORD-REMOTE",
+        brand_id="BRAND-X",
+        items=[OrderItem("1", "ORD-REMOTE", "ITM-1", 100, "REC-GRILL")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-REMOTE",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+    eligible = router.find_eligible_kitchens(order, {"K-01": k1}, zone, base_recipes)
+    assert len(eligible) == 0
+
+
+def test_routing_tie_break_lower_load(base_recipes, base_zone):
+    """BR-01: Equal projected ready times tie-break to kitchen with lowest current load."""
+    router = OrderRouter()
+    k1 = Kitchen(
+        kitchen_id="K-01",
+        name="Hub 1 (Busier Grill)",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"BRAND-X"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=2)},
+    )
+    k2 = Kitchen(
+        kitchen_id="K-02",
+        name="Hub 2 (Completely Empty)",
+        open_time=time(8, 0),
+        close_time=time(22, 0),
+        supported_brands={"BRAND-X"},
+        delivery_zones={"ZONE-1"},
+        stations={StationType.GRILL: Station(station_type=StationType.GRILL, capacity=2)},
+    )
+
+    from src.models import SlotBooking
+    # K-01 has 1 slot busy until 12:05
+    k1.stations[StationType.GRILL].slots[0].bookings.append(
+        SlotBooking("B1", "ITM-0", "ORD-0", "REC-GRILL", datetime(2026, 11, 6, 11, 55), datetime(2026, 11, 6, 12, 5))
+    )
+    # At 12:00, slot 1 on K-01 is available immediately (ready time = 12:13).
+    # On K-02, slot 0 is available immediately (ready time = 12:13).
+    # Both have same projected ready time (12:13), but K-02 has load=0 while K-01 has load=5m.
+    order = Order(
+        order_id="ORD-LOAD-TIE",
+        brand_id="BRAND-X",
+        items=[OrderItem("1", "ORD-LOAD-TIE", "ITM-1", 100, "REC-GRILL")],
+        channel=Channel.OWN_APP,
+        delivery_zone="ZONE-1",
+        order_time=datetime(2026, 11, 6, 12, 0, 0),
+    )
+
+    eval_result = router.route_order(order, {"K-01": k1, "K-02": k2}, base_zone, base_recipes)
+    assert eval_result.selected_kitchen_id == "K-02"
+

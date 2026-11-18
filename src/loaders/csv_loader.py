@@ -54,7 +54,7 @@ def _split_set(val: str, delimiter: str = ";") -> Set[str]:
 
 
 class CsvLoader:
-    """Loads and links domain models from CSV files."""
+    """Loads and links domain models from CSV files with robust validation."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir)
@@ -69,6 +69,8 @@ class CsvLoader:
             reader = csv.DictReader(f)
             for row in reader:
                 brand_id = row["brand_id"].strip()
+                if brand_id in brands:
+                    raise ValidationError(f"Duplicate brand ID detected: {brand_id}")
                 name = row["name"].strip()
                 brands[brand_id] = Brand(brand_id=brand_id, name=name)
         return brands
@@ -83,6 +85,8 @@ class CsvLoader:
             reader = csv.DictReader(f)
             for row in reader:
                 recipe_id = row["recipe_id"].strip()
+                if recipe_id in recipes:
+                    raise ValidationError(f"Duplicate recipe ID detected: {recipe_id}")
                 st_type = StationType.from_str(row["station_type"])
                 prep_min = int(row["prep_minutes"].strip())
                 batch_sz = int(row.get("max_batch_size", 1))
@@ -96,6 +100,9 @@ class CsvLoader:
                 )
                 DataValidator.validate_recipe(recipe)
                 recipes[recipe_id] = recipe
+
+        # Validate complete dependency graph (missing prerequisites and circular dependencies)
+        DataValidator.validate_recipes_dependency_graph(recipes)
         return recipes
 
     def load_menu_items(
@@ -113,6 +120,8 @@ class CsvLoader:
             reader = csv.DictReader(f)
             for row in reader:
                 item_id = row["item_id"].strip()
+                if item_id in menu_items:
+                    raise ValidationError(f"Duplicate item ID detected: {item_id}")
                 brand_id = row["brand_id"].strip()
                 name = row["name"].strip()
                 price = float(row["price"].strip())
@@ -148,7 +157,11 @@ class CsvLoader:
             reader = csv.DictReader(f)
             for row in reader:
                 zone_id = row["zone_id"].strip()
+                if zone_id in zones:
+                    raise ValidationError(f"Duplicate zone ID detected: {zone_id}")
                 delivery_min = int(row["delivery_minutes"].strip())
+                if delivery_min < 0:
+                    raise ValidationError(f"Delivery minutes cannot be negative for zone {zone_id}")
                 eligible_kitchens = _split_set(row.get("eligible_kitchen_ids", ""))
                 zones[zone_id] = DeliveryZone(
                     zone_id=zone_id,
@@ -170,10 +183,11 @@ class CsvLoader:
                 st_type = StationType.from_str(row["station_type"])
                 capacity = int(row["capacity"].strip())
                 st = Station(
-                    station_id=f"{kitchen_id}_{st_type.value}",
                     station_type=st_type,
                     capacity=capacity,
+                    station_id=f"{kitchen_id}_{st_type.value}",
                 )
+                DataValidator.validate_station(st)
                 stations[(kitchen_id, st_type)] = st
         return stations
 
@@ -193,6 +207,8 @@ class CsvLoader:
             reader = csv.DictReader(f)
             for row in reader:
                 k_id = row["kitchen_id"].strip()
+                if k_id in kitchens:
+                    raise ValidationError(f"Duplicate kitchen ID detected: {k_id}")
                 name = row["name"].strip()
                 open_t = _parse_time(row["open_time"])
                 close_t = _parse_time(row["close_time"])
@@ -230,10 +246,16 @@ class CsvLoader:
         if not path.exists():
             raise FileNotFoundError(f"Missing file: {path}")
 
+        seen_order_ids: Set[str] = set()
+
         with open(path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 order_id = row["order_id"].strip()
+                if order_id in seen_order_ids:
+                    raise ValidationError(f"Duplicate order ID detected: {order_id}")
+                seen_order_ids.add(order_id)
+
                 brand_id = row["brand_id"].strip()
                 channel = Channel.from_str(row["channel"])
                 zone_id = row["delivery_zone"].strip()
@@ -242,14 +264,32 @@ class CsvLoader:
                 priority_str = row.get("channel_priority", "false").strip().lower()
                 channel_priority = priority_str in ("true", "1", "yes", "priority")
 
-                raw_items = [it.strip() for it in row["items"].split(";") if it.strip()]
+                raw_tokens = [it.strip() for it in row["items"].split(";") if it.strip()]
                 order_items: List[OrderItem] = []
-                for idx, itm_code in enumerate(raw_items):
-                    if itm_code in menu_items:
-                        m_item = menu_items[itm_code]
+                item_counter = 0
+
+                for token in raw_tokens:
+                    # Support ITEM_ID or ITEM_ID:QTY
+                    parts = token.split(":")
+                    itm_code = parts[0].strip()
+                    qty = 1
+                    if len(parts) > 1:
+                        try:
+                            qty = int(parts[1].strip())
+                        except ValueError:
+                            raise ValidationError(f"Invalid quantity '{parts[1]}' for item {itm_code} in order {order_id}")
+                        if qty <= 0:
+                            raise ValidationError(f"Item quantity must be > 0 (found {qty} for item {itm_code} in order {order_id})")
+
+                    if itm_code not in menu_items:
+                        raise ValidationError(f"Order {order_id} references unknown menu item: {itm_code}")
+
+                    m_item = menu_items[itm_code]
+                    for _ in range(qty):
+                        item_counter += 1
                         order_items.append(
                             OrderItem(
-                                order_item_id=f"{order_id}_{idx+1}",
+                                order_item_id=f"{order_id}_{item_counter}",
                                 order_id=order_id,
                                 item_id=m_item.item_id,
                                 price=m_item.price,
@@ -305,10 +345,16 @@ class CsvLoader:
         if not path.exists():
             return events
 
+        seen_event_ids: Set[str] = set()
+
         with open(path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for idx, row in enumerate(reader):
                 ev_id = row.get("event_id", f"EV-{idx+1}").strip()
+                if ev_id in seen_event_ids:
+                    raise ValidationError(f"Duplicate event ID detected: {ev_id}")
+                seen_event_ids.add(ev_id)
+
                 ev_type = EventType.from_str(row["event_type"])
                 ts = _parse_datetime(row["timestamp"])
                 oid = row.get("order_id", "").strip() or None
