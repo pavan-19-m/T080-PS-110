@@ -215,6 +215,13 @@ Or run directly via root entry point:
 python main.py
 ```
 
+### Optional Interactive Web Dashboard
+To launch the interactive browser dashboard and REST API:
+```powershell
+python server.py
+```
+Then open `http://127.0.0.1:8000` in your web browser to view the interactive order routing matrix, brand P&L, channel breakdowns, and kitchen capacity.
+
 ---
 
 ## 11. CSV Input Format Schemas

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud Kitchen Multi-Brand Engine | T080 PS-110</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); padding: 24px; min-height: 100vh; }
+
+    header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 28px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-left h1 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .header-left p { font-size: 13px; color: var(--text-muted); }
+    .header-left .meta-pill {
+      display: inline-block;
+      background: #1e3a8a;
+      color: #93c5fd;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: 6px;
+    }
+
+    .btn-run {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+    .btn-run:hover { background: var(--primary-hover); }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .stat-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--text-main); }
+    .stat-sub { font-size: 12px; color: var(--accent); margin-top: 4px; }
+
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #1e3a8a;
+      color: #93c5fd;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th {
+      background: #0b1329;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-scheduled { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .badge-handed-off { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .badge-rejected { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .badge-cancelled { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .badge-rush { background: #831843; color: #f472b6; font-size: 10px; margin-left: 4px; }
+
+    footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 16px 0;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <h1>Cloud Kitchen Multi-Brand Order Routing & Kitchen Capacity Engine</h1>
+      <p>Padmavathi B (1AT24CG059) & Pavan Neelappa Mirji (1AT24CG060) | Department: CSE (Section CSD)</p>
+      <div class="meta-pill">Team ID: T080 | Problem Statement: PS-110 | Capstone Backend Engine</div>
+    </div>
+    <button class="btn-run" onclick="triggerSimulation()">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+      </svg>
+      Run Engine Simulation
+    </button>
+  </header>
+
+  <!-- Metric Overview Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Orders Processed</div>
+      <div class="stat-value" id="statOrders">--</div>
+      <div class="stat-sub" id="statOrdersSub">Ingested from CSV</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Gross Sales (GMV)</div>
+      <div class="stat-value" id="statGMV">--</div>
+      <div class="stat-sub">Across All Channels</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Platform Commissions</div>
+      <div class="stat-value" id="statComm">--</div>
+      <div class="stat-sub">Aggregator A / B / Own App</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Kitchen Rental Revenue</div>
+      <div class="stat-value" id="statRent">--</div>
+      <div class="stat-sub">BR-11 Base + Volume Min</div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('tabOrders')">Order Routing & Fulfillment</button>
+    <button class="tab-btn" onclick="switchTab('tabBrandPnl')">Brand P&L & Rent Settlement</button>
+    <button class="tab-btn" onclick="switchTab('tabChannels')">Channel Economics (BR-09)</button>
+    <button class="tab-btn" onclick="switchTab('tabKitchens')">Kitchen Hubs & Capacity</button>
+  </div>
+
+  <!-- Tab 1: Orders -->
+  <div id="tabOrders" class="tab-content active">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Brand</th>
+            <th>Channel</th>
+            <th>Assigned Kitchen</th>
+            <th>Placed</th>
+            <th>Projected Ready</th>
+            <th>Promised Delivery</th>
+            <th>Customer Total</th>
+            <th>Net Food</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="ordersBody">
+          <tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading simulation data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab 2: Brand P&L -->
+  <div id="tabBrandPnl" class="tab-content">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Brand ID</th>
+            <th>Kitchen</th>
+            <th>Orders</th>
+            <th>Gross Sales</th>
+            <th>Commissions</th>
+            <th>Net Food Value</th>
+            <th>Rent (BR-11)</th>
+            <th>Min Rent Triggered?</th>
+            <th>Brand Net P&L</th>
+          </tr>
+        </thead>
+        <tbody id="pnlBody">
+          <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading Brand P&L...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab 3: Channels -->
+  <div id="tabChannels" class="tab-content">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Channel Name</th>
+            <th>Orders Handled</th>
+            <th>Gross GMV</th>
+            <th>Commissions Deducted</th>
+            <th>Fixed Platform Fees</th>
+            <th>GST Collected (5%)</th>
+          </tr>
+        </thead>
+        <tbody id="channelsBody">
+          <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading channel metrics...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab 4: Kitchens -->
+  <div id="tabKitchens" class="tab-content">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Kitchen ID</th>
+            <th>Name</th>
+            <th>Operating Hours</th>
+            <th>Workstations</th>
+            <th>Delivery Zones</th>
+            <th>Daily Rent Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="kitchensBody">
+          <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading kitchen data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    T080 – PS-110: Cloud Kitchen Multi-Brand Order Routing and Kitchen Capacity Engine &copy; 2026 | Built for Capstone Submission
+  </footer>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    async function triggerSimulation() {
+      try {
+        const res = await fetch('/api/run-simulation');
+        const data = await res.json();
+
+        // Update stats
+        document.getElementById('statOrders').innerText = data.total_orders;
+        document.getElementById('statOrdersSub').innerText = `${data.fulfilled_count} fulfilled, ${data.rejected_count} rejected`;
+        document.getElementById('statGMV').innerText = `Rs. ${data.total_gmv.toFixed(2)}`;
+        document.getElementById('statComm').innerText = `Rs. ${data.total_commissions.toFixed(2)}`;
+        document.getElementById('statRent').innerText = `Rs. ${data.total_rent.toFixed(2)}`;
+
+        // Populate Orders Table
+        const ordersTbody = document.getElementById('ordersBody');
+        ordersTbody.innerHTML = '';
+        data.orders.forEach(o => {
+          let badgeClass = 'badge-scheduled';
+          if (o.status === 'REJECTED') badgeClass = 'badge-rejected';
+          else if (o.status.includes('CANCELLED')) badgeClass = 'badge-cancelled';
+          else if (o.status === 'HANDED_OFF') badgeClass = 'badge-handed-off';
+
+          const rushBadge = o.is_rush ? '<span class="badge badge-rush">RUSH</span>' : '';
+
+          ordersTbody.innerHTML += `
+            <tr>
+              <td><b>${o.order_id}</b>${rushBadge}</td>
+              <td>${o.brand}</td>
+              <td>${o.channel}</td>
+              <td><b>${o.kitchen}</b></td>
+              <td>${o.order_time}</td>
+              <td>${o.ready_time}</td>
+              <td>${o.promised_time}</td>
+              <td>Rs. ${o.customer_total.toFixed(2)}</td>
+              <td>Rs. ${o.net_food.toFixed(2)}</td>
+              <td><span class="badge ${badgeClass}">${o.status}</span></td>
+            </tr>
+          `;
+        });
+
+        // Populate Brand P&L Table
+        const pnlTbody = document.getElementById('pnlBody');
+        pnlTbody.innerHTML = '';
+        data.brand_pnl.forEach(p => {
+          const minPill = p.min_rent_applied ? '<span style="color: #f59e0b; font-weight: bold;">YES (Rs. 500)</span>' : '<span style="color: #94a3b8;">NO</span>';
+          const pnlColor = p.brand_net_pnl >= 0 ? '#34d399' : '#f87171';
+          pnlTbody.innerHTML += `
+            <tr>
+              <td><b>${p.brand_id}</b></td>
+              <td>${p.kitchen_id}</td>
+              <td>${p.order_count}</td>
+              <td>Rs. ${p.gross_sales.toFixed(2)}</td>
+              <td>Rs. ${p.commissions.toFixed(2)}</td>
+              <td>Rs. ${p.net_food.toFixed(2)}</td>
+              <td>Rs. ${p.rent.toFixed(2)}</td>
+              <td>${minPill}</td>
+              <td style="color: ${pnlColor}; font-weight: bold;">Rs. ${p.brand_net_pnl.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+
+        // Populate Channels Table
+        const chTbody = document.getElementById('channelsBody');
+        chTbody.innerHTML = '';
+        data.channels.forEach(c => {
+          chTbody.innerHTML += `
+            <tr>
+              <td><b>${c.channel}</b></td>
+              <td>${c.order_count}</td>
+              <td>Rs. ${c.gross_gmv.toFixed(2)}</td>
+              <td>Rs. ${c.commissions.toFixed(2)}</td>
+              <td>Rs. ${c.fixed_fees.toFixed(2)}</td>
+              <td>Rs. ${c.gst.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+
+        // Populate Kitchens Table
+        const kitchTbody = document.getElementById('kitchensBody');
+        kitchTbody.innerHTML = '';
+        data.kitchens.forEach(k => {
+          kitchTbody.innerHTML += `
+            <tr>
+              <td><b>${k.kitchen_id}</b></td>
+              <td>${k.name}</td>
+              <td>${k.hours}</td>
+              <td>${k.stations.join(', ')}</td>
+              <td>${k.delivery_zones.join(', ')}</td>
+              <td><b>Rs. ${k.rent_revenue.toFixed(2)}</b></td>
+            </tr>
+          `;
+        });
+
+      } catch (err) {
+        console.error('Error running simulation:', err);
+      }
+    }
+
+    // Auto-run simulation on page load
+    window.onload = triggerSimulation;
+  </script>
+</body>
+</html>
