@@ -350,7 +350,7 @@ This video demonstrates the working prototype of the Cloud Kitchen Multi-Brand O
 **Watch the Project Demonstration:**
 
 [▶ Watch the 5-Minute Project Demo]
-https://drive.google.com/file/d/1-xkuhZhXv8nHfAe_RdxtvvGPuAt7yJu8/view?usp=sharing
+https://drive.google.com/file/d/1RGttPz1WTpszRf_M4an8ryPRJggB3bMC/view?usp=sharing
 
 **Video Duration:** Approximately 5 minutes  
 **Format:** MP4 | Landscape
