@@ -335,4 +335,22 @@ ORD-104    B-01         AGGREGATOR_A  K-02     12:06:00  12:17:00  12:40:00  Rs.
 - **Team Members:**
   1. **Padmavathi B** – 1AT24CG059
   2. **Pavan Neelappa Mirji** – 1AT24CG060
-- **Academic Section:** CSD  
+- **Academic Section:** CSD
+
+---
+
+---
+
+## 16. Project Demonstration Video
+
+**PS-110 Capstone Project | Team T080**
+
+This video demonstrates the working prototype of the Cloud Kitchen Multi-Brand Order Routing and Kitchen Capacity Engine, including order processing, kitchen routing, station scheduling, financial reports, and dashboard functionality.
+
+**Watch the Project Demonstration:**
+
+[▶ Watch the 5-Minute Project Demo]
+https://drive.google.com/file/d/1-xkuhZhXv8nHfAe_RdxtvvGPuAt7yJu8/view?usp=sharing
+
+**Video Duration:** Approximately 5 minutes  
+**Format:** MP4 | Landscape
