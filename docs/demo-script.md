@@ -10,6 +10,8 @@
 
 This demonstration script provides an evaluator-ready, step-by-step 5-minute walkthrough of the Cloud Kitchen Engine. It demonstrates the live terminal execution, business rules enforcement, station scheduling, dynamic batching, priority queue jumping, and end-of-day financial settlement.
 
+- **Project Video Demonstration (Google Drive):** [Watch Video (T080-PS_110.mp4)](https://drive.google.com/file/d/1CkfR5VdzqK_3mf63K-Z7Ge5rqvkp7-ts/view?usp=drive_link)
+
 ### Prerequisites & Environment Verification
 Ensure you are in the project root directory and Python 3.10+ is available:
 ```bash

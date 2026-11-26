@@ -4,6 +4,7 @@
 **Team Members:** Padmavathi B (1AT24CG059) & Pavan Neelappa Mirji (1AT24CG060)  
 **Academic Section:** CSD  
 **Language:** Python 3.10+  
+**Project Demo Video:** [Google Drive Demonstration Link](https://drive.google.com/file/d/1CkfR5VdzqK_3mf63K-Z7Ge5rqvkp7-ts/view?usp=drive_link)  
 
 ---
 
@@ -335,9 +336,7 @@ ORD-104    B-01         AGGREGATOR_A  K-02     12:06:00  12:17:00  12:40:00  Rs.
 - **Team Members:**
   1. **Padmavathi B** – 1AT24CG059
   2. **Pavan Neelappa Mirji** – 1AT24CG060
-- **Academic Section:** CSD
-
----
+- **Academic Section:** CSD  
 
 ---
 
@@ -348,9 +347,7 @@ ORD-104    B-01         AGGREGATOR_A  K-02     12:06:00  12:17:00  12:40:00  Rs.
 This video demonstrates the working prototype of the Cloud Kitchen Multi-Brand Order Routing and Kitchen Capacity Engine, including order processing, kitchen routing, station scheduling, financial reports, and dashboard functionality.
 
 **Watch the Project Demonstration:**
-
-[▶ Watch the 5-Minute Project Demo]
-https://drive.google.com/file/d/1RGttPz1WTpszRf_M4an8ryPRJggB3bMC/view?usp=sharing
+- [▶ Watch the 5-Minute Project Demo on Google Drive](https://drive.google.com/file/d/1CkfR5VdzqK_3mf63K-Z7Ge5rqvkp7-ts/view?usp=drive_link)
 
 **Video Duration:** Approximately 5 minutes  
 **Format:** MP4 | Landscape

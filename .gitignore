@@ -49,3 +49,10 @@ output/
 
 # Nested clone
 T080-PS-110/
+
+# Video demo recordings (stored externally via Google Drive)
+*.mp4
+*.mkv
+*.mov
+*.avi
+
